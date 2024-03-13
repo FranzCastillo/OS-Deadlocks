@@ -15,7 +15,7 @@ sem_t semaphore[NUM_PHILOSOPHERS];
 int state[NUM_PHILOSOPHERS];
 
 void *philosopher(void *arg) {
-    int philosopher_id = *((int *)arg);
+    int philosopher_id = *((int *) arg);
     while (1) {
         // Thinking
         printf("Philosopher %d is thinking.\n", philosopher_id);
@@ -33,8 +33,20 @@ void *philosopher(void *arg) {
         }
         sem_post(&mutex);
 
-        // If couldn't eat, wait for forks
-        sem_wait(&semaphore[philosopher_id]);
+        // If couldn't eat, wait for forks for a limited time
+        int retries = 0;
+        while (state[philosopher_id] != EATING && retries < 3) { // Retry 3 times
+            retries++;
+            sleep(1); // Wait for a while
+        }
+        if (state[philosopher_id] != EATING) {
+            printf("Philosopher %d could not acquire forks after retries. Giving up.\n", philosopher_id);
+            sem_wait(&mutex);
+            state[philosopher_id] = THINKING; // Back to thinking
+            sem_post(&mutex);
+            continue; // Skip to next iteration
+        }
+
         // Eating
         printf("Philosopher %d grabbed forks and is eating.\n", philosopher_id);
         sleep(2);
@@ -58,6 +70,7 @@ void *philosopher(void *arg) {
     }
     return NULL;
 }
+
 
 int main() {
     pthread_t philosophers[NUM_PHILOSOPHERS];
